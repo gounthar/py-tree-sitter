@@ -12,7 +12,7 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted, linux, riscv64]
+    runs-on: ubuntu-24.04-riscv
     timeout-minutes: 120
     steps:
       - name: Checkout
@@ -22,16 +22,13 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Set up Python
-        run: |
-          python3 -m venv --system-site-packages /tmp/build-venv
-          . /tmp/build-venv/bin/activate
-          pip install --upgrade pip 'setuptools<81' wheel
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Build wheel
         run: |
-          . /tmp/build-venv/bin/activate
-          pip wheel . --no-deps --wheel-dir /tmp/wheels/
+          uvx --python 3.12 --with 'setuptools<81' --with wheel \
+            pip wheel . --no-deps --wheel-dir /tmp/wheels/
 
       - name: Verify platform tag
         run: |
@@ -54,11 +51,11 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: rm -rf /tmp/build-venv /tmp/wheels
+        run: rm -rf /tmp/wheels
 
   release:
     needs: build
-    runs-on: [self-hosted, linux, riscv64]
+    runs-on: ubuntu-latest
     if: success()
     env:
       GH_REPO: ${{ github.repository }}
@@ -99,8 +96,7 @@ jobs:
           gh release create "$TAG" \
             --title "$TITLE" \
             --notes "Prebuilt riscv64 wheel.
-          Built on: BananaPi F3 (SpacemiT K1, rv64imafdcv)
-          Python: $(python3 --version 2>&1)
+          Built on: RISE riscv64 runner (ubuntu-24.04-riscv)
           Wheel: ${{ steps.wheel_info.outputs.whl_name }}" \
             /tmp/wheels/*.whl \
             /tmp/wheels/SHA256SUMS
